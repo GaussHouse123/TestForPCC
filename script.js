@@ -61,6 +61,9 @@ const fileInput = document.getElementById("video-file-input");
 const startBtn = document.getElementById("btn-start");
 const stopBtn = document.getElementById("btn-stop");
 const statusEl = document.getElementById("status");
+const playbackSpeedRow = document.getElementById("playback-speed-row");
+const playbackSpeedSelect = document.getElementById("playbackSpeedSelect");
+
 
 // IMU / CSV UI elements
 const imuPanel = document.getElementById("imu-panel");
@@ -70,6 +73,9 @@ const imuStatusEl = document.getElementById("imu-status");
 const syncStatusEl = document.getElementById("syncStatus");
 const dataTimelineSlider = document.getElementById("dataTimelineSlider");
 const dataTimeDisplay = document.getElementById("dataTimeDisplay");
+const videoSliderRow = document.getElementById("video-slider-row");
+const videoSlider = document.getElementById("videoTimelineSlider");
+const videoTimeDisplay = document.getElementById("videoTimeDisplay");
 const markVideoBtn = document.getElementById("markVideoBtn");
 const markDataBtn = document.getElementById("markDataBtn");
 const setSyncBtn = document.getElementById("setSyncBtn");
@@ -494,6 +500,48 @@ function setupCsvUpload() {
   });
 }
 
+/** Video Scrub Slider **/
+function setupVideoSlider() {
+  if (!videoSlider) return;
+
+  // When metadata loads, set max slider value
+  video.addEventListener("loadedmetadata", () => {
+    videoSlider.max = video.duration.toFixed(2);
+    videoSlider.value = 0;
+    videoTimeDisplay.textContent = formatTime(0);
+  });
+
+  // User drags slider → seek video
+  videoSlider.addEventListener("input", () => {
+    const t = parseFloat(videoSlider.value);
+    if (!Number.isFinite(t)) return;
+    video.currentTime = t;
+    videoTimeDisplay.textContent = formatTime(t);
+  });
+
+  // Video playing → move slider automatically
+  video.addEventListener("timeupdate", () => {
+    if (!video.paused && !video.seeking) {
+      videoSlider.value = video.currentTime;
+      videoTimeDisplay.textContent = formatTime(video.currentTime);
+    }
+  });
+}
+
+/** Playback Speed Setup **/
+function setupPlaybackSpeedControl() {
+  if (!playbackSpeedSelect) return;
+
+  playbackSpeedSelect.addEventListener("change", () => {
+    const speed = parseFloat(playbackSpeedSelect.value);
+    if (!Number.isFinite(speed)) return;
+
+    video.playbackRate = speed;
+  });
+}
+
+
+
 // Set up buttons for marking sync points (video time, data time)
 function setupSyncButtons() {
   if (markVideoBtn) {
@@ -698,7 +746,6 @@ async function handleStart() {
       return;
     }
 
-    video.playbackRate = 1.0;
   } else {
     detector = uploadDetector;
     if (!detector) {
@@ -711,17 +758,17 @@ async function handleStart() {
       return;
     }
 
-    // Slightly slower playback, so detection can keep up more easily
-    video.playbackRate = 0.75;
-
     if (video.paused || video.currentTime === 0) {
       try {
         await video.play();
-      } catch (_) {
-        // Ignore play errors (e.g. autoplay restrictions)
-      }
+      } catch (_) {}
     }
   }
+
+  // --- APPLY USER SELECTED SPEED ---
+  const chosenSpeed = parseFloat(playbackSpeedSelect.value) || 1.0;
+  video.playbackRate = chosenSpeed;
+  // ---------------------------------
 
   frameIndex = 0;
   lastPose = null;
@@ -734,6 +781,7 @@ async function handleStart() {
   );
   animationId = requestAnimationFrame(renderFrame);
 }
+
 
 // Stop tracking and pause video in upload mode
 function stopTracking() {
@@ -771,6 +819,10 @@ function selectMode(mode) {
 
   // Show or hide upload controls & IMU panel
   uploadControls.style.display = mode === "upload" ? "block" : "none";
+  videoSliderRow.style.display = mode === "upload" ? "block" : "none";
+  playbackSpeedRow.style.display = mode === "upload" ? "block" : "none";
+
+
   if (imuPanel) {
     imuPanel.style.display = mode === "upload" ? "block" : "none";
   }
@@ -878,7 +930,9 @@ async function main() {
   // Initialize IMU / CSV functions
   initImuCharts();
   setupCsvUpload();
+  setupVideoSlider();
   setupSyncButtons();
+  setupPlaybackSpeedControl();
 }
 
 // Start everything
@@ -886,3 +940,5 @@ main().catch((err) => {
   console.error(err);
   setStatus("Error during initialization. See console for details.");
 });
+script.js
+27 KB
